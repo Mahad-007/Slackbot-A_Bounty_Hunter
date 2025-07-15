@@ -101,7 +101,8 @@ def get_top_bounties(bounties):
 
 def get_bounties():
     print("📡 Fetching bounties via Firecrawl /scrape API...")
-    url = "https://api.firecrawl.dev/scrape"
+    url ="https://api.firecrawl.dev/v1/scrape"
+Also check the header contain:
     headers = {
         "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
         "Content-Type": "application/json"
