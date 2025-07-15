@@ -101,7 +101,7 @@ def get_top_bounties(bounties):
 
 def get_bounties():
     print("📡 Fetching bounties via Firecrawl /scrape API...")
-    url ="https://api.firecrawl.dev/v1/scrape"
+    url = "https://api.firecrawl.dev/v1/scrape"
 
     headers = {
         "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
@@ -160,15 +160,23 @@ def send_to_slack(bounty):
 # === Main scraping logic (can be called by endpoint or scheduler) ===
 def run_scraper():
     bounties = get_bounties()
-    top_bounties = get_top_bounties(bounties)
-    sent = read_sent_links()
-    unsent = [b for b in top_bounties if b["link"] not in sent]
-    if not unsent:
+    now = datetime.now(timezone.utc)
+    # Only consider bounties with a valid posted_time within the last 24 hours
+    recent_bounties = [b for b in bounties if b.get("posted_time") and (now - b["posted_time"]).total_seconds() <= 86400]
+    if not recent_bounties:
         return {"message": "No new bounties found in the last 24 hours."}
-    top = unsent[0]
-    send_to_slack({"title": top["title"], "link": top["link"]})
-    write_sent_link(top["link"])
-    return {"message": "Sent top bounty to Slack.", "bounty": top}
+    # Find the highest price among recent bounties
+    max_price = max(b["price"] for b in recent_bounties)
+    # Filter for bounties with the highest price
+    top_bounties = [b for b in recent_bounties if b["price"] == max_price]
+    # If multiple, pick the most recently posted
+    top_bounty = max(top_bounties, key=lambda b: b["posted_time"])
+    sent = read_sent_links()
+    if top_bounty["link"] in sent:
+        return {"message": "No new bounties found in the last 24 hours."}
+    send_to_slack({"title": top_bounty["title"], "link": top_bounty["link"]})
+    write_sent_link(top_bounty["link"])
+    return {"message": "Sent top bounty to Slack.", "bounty": top_bounty}
 
 # === Flask endpoint ===
 @app.route("/scrape", methods=["GET"])
